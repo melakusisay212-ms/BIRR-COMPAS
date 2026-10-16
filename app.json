@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Birr Compass",
+    "slug": "birr-compass",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": { "supportsTablet": false, "bundleIdentifier": "com.example.birrcompass" },
+    "android": { "package": "com.example.birrcompass" },
+    "plugins": ["expo-localization", "expo-notifications"]
+  }
+}
