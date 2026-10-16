@@ -1,4 +1,4 @@
-name: Build
+name: Build Android APK
 
 on:
   push:
@@ -11,10 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
+          cache: npm
+
+      - run: npm ci || npm install
       - run: npm test
       - run: npm run typecheck
         continue-on-error: true
@@ -22,31 +25,65 @@ jobs:
   android-apk:
     needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+
+      # SDK 54 / RN 0.81 works with JDK 17
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
-      - uses: gradle/actions/setup-gradle@v4
-      - run: npm install
-      - run: npx expo install --fix
-      - run: npx expo prebuild --platform android --no-install
 
-      - name: Find the broken module
+      - uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses >/dev/null || true
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Clean, aligned install (critical for the Publication.version error)
+      - name: Install dependencies
+        run: |
+          npm ci || npm install
+          npx expo install --fix
+
+      - name: Prebuild Android project
+        run: npx expo prebuild --platform android --clean
+
+      # Optional: show which module is missing publication.version
+      - name: Debug autolinking (if build still fails)
+        if: failure()
         run: |
           npx expo-modules-autolinking resolve --platform android --json > /tmp/al.json || true
-          node -e "const j=require('/tmp/al.json');(j.modules||[]).forEach((m,i)=>(m.projects||[]).forEach(p=>{if(!p.publication||!p.publication.version)console.log('MISSING VERSION:',i,m.packageName,m.packageVersion)}))" || true
-          npm ls expo expo-modules-core expo-modules-autolinking --all | head -40 || true
+          node -e "
+            const j = require('/tmp/al.json');
+            (j.modules || []).forEach((m, i) => {
+              (m.projects || []).forEach(p => {
+                if (p.publication && !p.publication.version) {
+                  console.log('MISSING VERSION at modules[' + i + ']:', m.packageName, m.packageVersion);
+                  console.log(JSON.stringify(p.publication, null, 2));
+                }
+              });
+            });
+          " || true
           npx expo-doctor || true
 
-      - run: ./gradlew assembleRelease --no-daemon --stacktrace -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g" -PreactNativeArchitectures=arm64-v8a
+      - name: Build release APK
         working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace \
+            -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g" \
+            -PreactNativeArchitectures=arm64-v8a
 
       - uses: actions/upload-artifact@v4
         with:
           name: birr-compass-apk
           path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
