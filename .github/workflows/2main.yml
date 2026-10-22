@@ -35,8 +35,10 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Check Expo dependencies
-        run: npx expo install --check
+      - name: fix Expo dependencies
+        run: npx expo install --fix
+          - name: verify Expo dependencies
+          run: npx expo install --check
 
       - name: Check project configuration
         run: npx expo-doctor
