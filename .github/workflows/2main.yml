@@ -36,13 +36,13 @@ jobs:
       - name: Install npm dependencies
         run: npm install
 
-      - name: Fix Expo-compatible dependencies
+      - name: Align Expo dependencies
         run: npx expo install --fix
 
-      - name: Verify Expo dependency compatibility
+      - name: Verify Expo dependencies
         run: npx expo install --check
 
-      - name: Check project configuration
+      - name: Check Expo project configuration
         run: npx expo-doctor
 
       - name: Run tests
